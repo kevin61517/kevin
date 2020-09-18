@@ -1,0 +1,8 @@
+class Radio:
+    ...
+
+
+class Client:
+    ...
+
+
