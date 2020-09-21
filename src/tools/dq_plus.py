@@ -14,9 +14,9 @@ __method_append = dict()
 option_map = {'append': __method_append}
 
 
-def _method_map(option, method_key):
+def _method_map(option, side):
     def mid(method):
-        option_map[option].update({method_key: method})
+        option_map[option].update({side: method})
 
         @functools.wraps(method)
         def inside(*args, **kws):
@@ -35,7 +35,7 @@ class _Implement(deque):
         option_map[option].get(key, self)(self, *args)
         return self
 
-    @_method_map(option="append", method_key="right")
+    @_method_map(option="append", side="right")
     def _a_right(self, *objs: Any) -> None:
         """
         right append
@@ -46,7 +46,7 @@ class _Implement(deque):
         for obj in objs:
             super().append(obj)
 
-    @_method_map(option="append", method_key="left")
+    @_method_map(option="append", side="left")
     def _a_left(self, *objs: Any) -> None:
         """
         left append
@@ -57,7 +57,7 @@ class _Implement(deque):
         for obj in objs:
             super().appendleft(obj)
 
-    @_method_map(option="append", method_key="both_side")
+    @_method_map(option="append", side="both")
     def _a_both(self, *objs: Any) -> None:
         """
         left and right
