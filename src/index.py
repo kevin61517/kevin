@@ -84,10 +84,6 @@ class Users:
         return data
 
 
-# 資料庫實例化
-# users = Users()
-
-
 class Server:
     """伺服器"""
     def __init__(self):
@@ -158,10 +154,6 @@ class Register:
         _md5.update(target_str.encode('utf-8'))
         crypto_str = _md5.hexdigest()
         return crypto_str
-
-
-# 伺服器實例化
-# server = Server()
 
 
 def init():
@@ -280,10 +272,14 @@ def _login2(**kws):
 ##############################
 
 
+# 資料庫實例化
 users = Users()
-server = Server()
-init()
 
+# 伺服器實例化
+server = Server()
+
+# 伺服器初始化
+init()
 
 
 # @app.route("/index")
