@@ -104,8 +104,6 @@ class Server:
 
 class Login:
     """登入相關邏輯"""
-    def __init__(self):
-        self._md5 = md5()
 
     def do(self, username, pw):
         user = users.filter_by(username)
@@ -113,10 +111,12 @@ class Login:
         check = self._valid_pw(username=username, pw=pw, origin_pw_hash=origin_pw_hash)
         return check
 
-    def _valid_pw(self, username, pw, origin_pw_hash):
+    @classmethod
+    def _valid_pw(cls, username, pw, origin_pw_hash):
+        _md5 = md5()
         target_str = username + pw
-        self._md5.update(target_str.encode('utf-8'))
-        check_pw_hash = self._md5.hexdigest()
+        _md5.update(target_str.encode('utf-8'))
+        check_pw_hash = _md5.hexdigest()
         if check_pw_hash != origin_pw_hash:
             return False
         return True
@@ -124,8 +124,6 @@ class Login:
 
 class Register:
     """註冊相關邏輯"""
-    def __init__(self):
-        self._md5 = md5()
 
     def get_register_data(self, username: str, student_id: str) -> dict:
         _username = self._valid_username(username=username)
@@ -152,11 +150,13 @@ class Register:
         else:
             return student_id
 
-    def _info_crypto(self, username: str, pw: str):
+    @classmethod
+    def _info_crypto(cls, username: str, pw: str):
         """資料加密"""
+        _md5 = md5()
         target_str = username + pw
-        self._md5.update(target_str.encode('utf-8'))
-        crypto_str = self._md5.hexdigest()
+        _md5.update(target_str.encode('utf-8'))
+        crypto_str = _md5.hexdigest()
         return crypto_str
 
 
