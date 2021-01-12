@@ -4,14 +4,12 @@ Spyder Editor
 
 This is a temporary script file.
 """
-import sqlalchemy as sa
-import abc
 import random as ra
 import types
 import sqlite3
 import json
-from abc import ABC
 from functools import wraps
+from hashlib import md5
 from flask import Flask, jsonify
 from flask import render_template
 from flask import request
@@ -19,116 +17,25 @@ from flask import request
 app = Flask(__name__)
 
 
-class Tables:
-    """
-    資料表管理
-        - 存放資料物件
-    """
-    def __init__(self, columns):
-        self._id = 1
-        self._tables = dict()
-
-    def get(self, _table):
-        if hasattr(_table, '__Type__'):
-            raise TypeError
-        key = _table.__class__.__name__
-        return self._tables.get(key)
-
-    def post(self, _table: object):
-        key = _table.__class__.__name__
-        value = _table
-        self._tables.update({key: value})
+class MissingColumnError(KeyError):
+    pass
 
 
-class _ModelBase:
-    """
-    資料庫模型基類:
-        - abc.ABC為強迫實作方法
-    """
-    def __init_subclass__(cls, **kwargs):
-        cls.__Type__ = 'model'
-        cls.__columns__ = dict()
+def schema(*columns):
+    """檢查request資料欄位"""
+    def _mid(f):
+        @wraps(f)
+        def _inside(*args, **kws):
+            data = request.args.to_dict()
+            for column in columns:
+                if not data.get(column):
+                    raise MissingColumnError(f'Missing Column {column}')
+            kws.update(**data)
+            return f(*args, **kws)
 
-    def get(self, *args, **kws):
-        """資料庫查詢欄位"""
-        if args:
-            result = self.__columns__.get(args[0])
-        elif kws:
-            for k, v in self.__columns__.items():...
+        return _inside
 
-    def add(self, **kws):
-        """資料庫新增欄位"""
-        self.__columns__.update({**kws})
-
-
-class Db:
-
-    db_path = "db.sqlite"
-
-    def __init__(self):
-        self.__conn = sqlite3.connect(self.db_path)
-
-    def new_member(self, user, password):
-        cursor = self.__conn.cursor()
-        sql = "select * from member where user=?"
-        result = cursor.execute(sql, (user,))
-        result = result.fetchone()
-        if(result != None):  # 可以修飾
-            return "此帳號已有人使用"
-        else:
-            sql = "insert into member(user, password) values(?,?)"
-            cursor.execute(sql, (user, password))
-            self.__conn.commit()
-            return "ok"
-        cursor.close()
-
-    def login(self, user, password):
-        cursor = self.__conn.cursor()
-        sql = "select * from member where user=?"
-        result = cursor.execute(sql, (user,))
-        result = result.fetchone()
-        cursor.close()
-        if(result != None):  # 可以修飾
-            if(result[1] == password):
-                
-                return "登入成功"
-            else:
-                return "密碼錯誤"
-        else:
-            return "沒這個帳號"
-
-    def figure(self):
-        cursor = self.__conn.cursor()
-        sql = "select count(*) from figure"
-        result = cursor.execute(sql)
-        result = result.fetchone()[0]
-        sn = ra.randint(1, result)
-        sql = "select * from figure where sn=?"
-        result = cursor.execute(sql, (sn,))
-        result = result.fetchone()
-        path = result[1]
-        cursor.close()
-        return path
-
-
-class MySQL:
-    def __init__(self, *dbs):
-        self._tables = {}
-        self._init(*dbs)
-
-    def _init(self, *dbs):
-        for db in dbs:
-            if not hasattr(db, 'get'):
-                print(f'== DataBase: {db.__name__} Default FAIL ==')
-            self._tables.update({db.__class__.__name__: db})
-
-    def query(self, model):
-        model_name = model.__class__.__name__
-        return self._tables.get(model_name)
-
-
-class MissingColumnError:
-    ...
+    return _mid
 
 
 class Users:
@@ -141,7 +48,7 @@ class Users:
     def create(self, **data) -> None:
         """新增"""
         _data = self._schema(data, d=True)
-        data['id'] = self._id
+        _data['id'] = self._id
         self._columns.append(_data)
         print(self._columns)
         self._id += 1
@@ -151,15 +58,16 @@ class Users:
         for column in self._columns:
             if column.get('username') == username:
                 return column
-        return f'User {username} is not exist!!'
+        return {}
 
     def get(self, id_: int) -> dict:
         """index精準查詢"""
-        return self._columns[id_-1]
+        return self._columns[id_ - 1]
 
     def _schema(self, data: dict, d=False) -> dict:
         """檢查資料是否符合格式"""
         for _column in self._columns_schema:
+            print(f'{_column}--->', data.get(_column.lower()))
             if not data.get(_column.lower()):
                 if not d:
                     raise KeyError(f'Missing column {_column}!!')
@@ -168,22 +76,82 @@ class Users:
         return data
 
 
-def schema(*columns):
-
-    def _mid(f):
-        @wraps(f)
-        def _inside(*args, **kws):
-            data = request.args.to_dict()
-            for column in columns:
-                if not data.get(column):
-                    raise KeyError(f'Missing Column {column}')
-            kws.update(**data)
-            return f(*args, **kws)
-        return _inside
-    return _mid
-
-
 users = Users()
+
+
+class Server:
+    """伺服器"""
+    def __init__(self):
+        self._register = Register()  # 註冊
+        self._login = Login()  # 登入
+
+    def register(self, username, student_id):
+        register_data = self._register.get_register_data(username=username, student_id=student_id)
+        users.create(**register_data)
+
+    def login(self, username, pw):
+        return self._login.do(username=username, pw=pw)
+
+
+class Login:
+    """登入相關邏輯"""
+    def __init__(self):
+        self._md5 = md5()
+
+    def do(self, username, pw):
+        user = users.filter_by(username)
+        origin_pw_hash = user.get('password_hash')
+        check = self._valid_pw(username=username, pw=pw, origin_pw_hash=origin_pw_hash)
+        return check
+
+    def _valid_pw(self, username, pw, origin_pw_hash):
+        target_str = username + pw
+        self._md5.update(target_str.encode('utf-8'))
+        check_pw_hash = self._md5.hexdigest()
+        if check_pw_hash != origin_pw_hash:
+            return False
+        return True
+
+
+class Register:
+    """註冊相關邏輯"""
+    def __init__(self):
+        self._md5 = md5()
+
+    def get_register_data(self, username: str, student_id: str) -> dict:
+        _username = self._valid_username(username=username)
+        _password = self._get_default_pw(from_=student_id)
+        _crypto_str = self._info_crypto(username=_username, pw=_password)
+        return {'username': _username, 'student_id': student_id, 'password_hash': _crypto_str}
+
+    @classmethod
+    def _valid_username(cls, username: str) -> str:
+        """檢查username格式"""
+        if len(username) < 10:
+            raise ValueError('Username len must over ten.')
+        return username
+
+    @staticmethod
+    def _get_default_pw(from_: str) -> str:
+        student_id = from_
+        """預設密碼"""
+        if not student_id:
+            raise ValueError('Please key in your student_id.')
+        length = len(student_id)
+        if length >= 4:
+            return student_id[length - 4:]
+        else:
+            return student_id
+
+    def _info_crypto(self, username: str, pw: str):
+        """資料加密"""
+        target_str = username + pw
+        self._md5.update(target_str.encode('utf-8'))
+        crypto_str = self._md5.hexdigest()
+        return crypto_str
+
+
+server = Server()
 
 
 def init():
@@ -204,7 +172,7 @@ init()
 
 @app.route("/kevin", methods=["GET"])
 @schema('username')
-def kevin(**kws):
+def search(**kws):
     data = users.filter_by(**kws)
     data.pop('password_hash')
     return jsonify(data)
@@ -229,73 +197,98 @@ def register(**kws):
 def _login(**kws):
     pw = kws.get('password')
     username = kws.get('username')
-    print(f'this is username: {username}')
-    print(f'this is password: {pw}')
-    pwh = hash(username + pw)
-    print(f'this is pwh: {pwh}')
+    pwh = hash(pw + username)
     user = users.filter_by(username=username)
     if user.get('password_hash') != pwh:
-        return '== LOGIN FAIL =='
-    return 'LOGIN SUCCESS!!!'
+        return f'User {username} is not exist!!'
+    return 'LOGIN SUCCESS!!'
 
 
-@app.route("/index")
-def index():
-    return render_template("index.html")  
+@app.route("/kevin2", methods=["GET"])
+@schema('username')
+def search2(**kws):
+    data = users.filter_by(**kws)
+    data.pop('password_hash')
+    return jsonify(data)
 
 
-@app.route("/login")
-def login():
-    return render_template("login.html")
+@app.route("/register2")
+@schema('username', 'student_id')
+def register2(**kws):
+    username = kws.get('username')
+    student_id = kws.get('student_id')
+    server.register(username, student_id)
+    return 'SUCCESS'
 
 
-@app.route("/new_member")
-def new_member():
-    return render_template("newmember.html")
+@app.route("/login2")
+@schema('username', 'password')
+def _login2(**kws):
+    pw = kws.get('password')
+    username = kws.get('username')
+    check = server.login(username, pw)
+    if not check:
+        return f'User {username} is not exist!!'
+    return 'LOGIN SUCCESS!!'
 
 
-@app.route("/member_ok", methods=['POST'])
-def member_ok():
-    user = request.values["user"]
-    password = request.values["password"]
-    confirm = request.values["confirm"]
-    if(password != confirm):
-        result = "密碼不一致"
-        return render_template("check.html", **locals())
-    else:
-        db_result = Db()
-        result = db_result.newmember(user, password)
-        if(result == "此帳號已有人使用"):
-            return render_template("check.html", **locals())
-        else:
-            result = user
-            return render_template("welcome.html", **locals())
-        #return render_template("login.html")
-
-
-@app.route("/submit",methods=['POST'])
-def submit():
-    user = request.values["user"]
-    password = request.values["password"]
-    result = Db()
-    result1 = result.login(user,password)
-    if(result1 == "登入成功"):
-        result = user
-        return render_template("welcome.html", **locals())
-    elif(result1 == "密碼錯誤"):
-        result = "密碼錯誤"
-        return render_template("check.html", **locals())
-    else:
-        result = "沒有這個帳號"
-        return render_template("check.html", **locals())
-
-
-@app.route("/ok", methods=['GET'])
-def ok():
-    user = request.args.get("user")
-    result = Db()
-    path = result.figure()
-    return render_template("figure.html", **locals())
+# @app.route("/index")
+# def index():
+#     return render_template("index.html")
+#
+#
+# @app.route("/login")
+# def login():
+#     return render_template("login.html")
+#
+#
+# @app.route("/new_member")
+# def new_member():
+#     return render_template("newmember.html")
+#
+#
+# @app.route("/member_ok", methods=['POST'])
+# def member_ok():
+#     user = request.values["user"]
+#     password = request.values["password"]
+#     confirm = request.values["confirm"]
+#     if (password != confirm):
+#         result = "密碼不一致"
+#         return render_template("check.html", **locals())
+#     else:
+#         db_result = Db()
+#         result = db_result.newmember(user, password)
+#         if (result == "此帳號已有人使用"):
+#             return render_template("check.html", **locals())
+#         else:
+#             result = user
+#             return render_template("welcome.html", **locals())
+#         # return render_template("login.html")
+#
+#
+# @app.route("/submit", methods=['POST'])
+# def submit():
+#     user = request.values["user"]
+#     password = request.values["password"]
+#     result = Db()
+#     result1 = result.login(user, password)
+#     if (result1 == "登入成功"):
+#         result = user
+#         return render_template("welcome.html", **locals())
+#     elif (result1 == "密碼錯誤"):
+#         result = "密碼錯誤"
+#         return render_template("check.html", **locals())
+#     else:
+#         result = "沒有這個帳號"
+#         return render_template("check.html", **locals())
+#
+#
+# @app.route("/ok", methods=['GET'])
+# def ok():
+#     user = request.args.get("user")
+#     result = Db()
+#     path = result.figure()
+#     return render_template("figure.html", **locals())
 
 
 if __name__ == "__main__":
