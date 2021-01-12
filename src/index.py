@@ -17,8 +17,16 @@ from flask import request
 app = Flask(__name__)
 
 
-class MissingColumnError(KeyError):
-    pass
+class MissingColumnError(Exception):
+    """缺少資料庫欄位錯誤"""
+    def __init__(self, column):
+        super().__init__(f'自定義錯誤：缺少資料庫欄位{column}')
+
+
+class NameToShortError(Exception):
+    """帳號名稱過短"""
+    def __init__(self, username):
+        super().__init__(f'自定義錯誤：帳號名稱過短，使用者名稱{username}長度只有{len(username)}，規定為10')
 
 
 def schema(*columns):
@@ -29,7 +37,7 @@ def schema(*columns):
             data = request.args.to_dict()
             for column in columns:
                 if not data.get(column):
-                    raise MissingColumnError(f'Missing Column {column}')
+                    raise MissingColumnError(column)
             kws.update(**data)
             return f(*args, **kws)
 
@@ -76,7 +84,8 @@ class Users:
         return data
 
 
-users = Users()
+# 資料庫實例化
+# users = Users()
 
 
 class Server:
@@ -128,7 +137,7 @@ class Register:
     def _valid_username(cls, username: str) -> str:
         """檢查username格式"""
         if len(username) < 10:
-            raise ValueError('Username len must over ten.')
+            raise NameToShortError(username)
         return username
 
     @staticmethod
@@ -151,12 +160,17 @@ class Register:
         return crypto_str
 
 
-server = Server()
+# 伺服器實例化
+# server = Server()
 
 
 def init():
-    username = 'jojo'
-    student_id = '0000'
+    """
+    初始化伺服器:
+        - 設置訪客帳號
+    """
+    username = 'iam69master'
+    student_id = '123456789'
     pw_hash = hash(username + student_id)
     data = {
         'username': username,
@@ -167,46 +181,77 @@ def init():
     print('== db init SUCCESS ==')
 
 
-init()
+@app.route("/home", methods=["GET"])
+def home(**kws):
+    """首頁"""
+    return '首頁'
 
 
-@app.route("/kevin", methods=["GET"])
+##############################
+#           普通API          #
+##############################
+@app.route("/search", methods=["GET"])
 @schema('username')
 def search(**kws):
+    """搜尋使用者"""
     data = users.filter_by(**kws)
     data.pop('password_hash')
     return jsonify(data)
 
 
 @app.route("/register")
-@schema('username', 'student_id', 'password')
+@schema('username', 'student_id')
 def register(**kws):
-    pw = kws.pop('password')
+    """使用者註冊"""
+
+    # 取得使用者資訊
+    student_id = kws.pop('student_id')
     username = kws.get('username')
-    _hash = hash(pw + username)
-    print(f'this is pw: {pw}')
-    print(f'this is username: {username}')
-    print(f'this is _hash: {_hash}')
-    kws['password_hash'] = _hash
+
+    if len(username) < 10:
+        """檢查帳號長度"""
+        return '帳號名稱過短'
+
+    # 設置密碼(學號末四碼)
+    pw = student_id[:len(student_id)-4]  # 學號末四碼
+
+    # 取得、設置雜湊(用帳號+密碼進行運算) -> 務必密碼在前、帳號在後 pw+username, 反過來結果會不同
+    kws['password_hash'] = hash(pw + username)
+
+    # 存db
     users.create(**kws)
-    return 'SUCCESS'
+    return '註冊成功'
 
 
 @app.route("/login")
 @schema('username', 'password')
 def _login(**kws):
+    """使用者登入"""
+
+    # 取得使用者資訊
     pw = kws.get('password')
     username = kws.get('username')
+
+    # 以使用者輸入的密碼與帳號運算雜湊
     pwh = hash(pw + username)
+
+    # 查詢資料庫
     user = users.filter_by(username=username)
+
+    # 比對帳號密碼
     if user.get('password_hash') != pwh:
-        return f'User {username} is not exist!!'
-    return 'LOGIN SUCCESS!!'
+        """比對雜湊值"""
+        return '帳號或密碼錯誤'
+    return '登入成功'
 
 
-@app.route("/kevin2", methods=["GET"])
+##############################
+#           優化API          #
+##############################
+@app.route("/search2", methods=["GET"])
 @schema('username')
 def search2(**kws):
+    """搜尋使用者(優化版)"""
     data = users.filter_by(**kws)
     data.pop('password_hash')
     return jsonify(data)
@@ -215,21 +260,30 @@ def search2(**kws):
 @app.route("/register2")
 @schema('username', 'student_id')
 def register2(**kws):
+    """使用者註冊(優化版)"""
     username = kws.get('username')
     student_id = kws.get('student_id')
     server.register(username, student_id)
-    return 'SUCCESS'
+    return '註冊成功'
 
 
 @app.route("/login2")
 @schema('username', 'password')
 def _login2(**kws):
+    """使用者登入(優化版)"""
     pw = kws.get('password')
     username = kws.get('username')
-    check = server.login(username, pw)
-    if not check:
-        return f'User {username} is not exist!!'
-    return 'LOGIN SUCCESS!!'
+    login_success = server.login(username, pw)
+    if not login_success:
+        return '帳號或密碼錯誤'
+    return '登入成功'
+##############################
+
+
+users = Users()
+server = Server()
+init()
+
 
 
 # @app.route("/index")
