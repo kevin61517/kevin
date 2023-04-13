@@ -1,0 +1,22 @@
+<component name="InspectionProjectProfileManager">
+  <profile version="1.0">
+    <option name="myName" value="Project Default" />
+    <inspection_tool class="PyPackageRequirementsInspection" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ignoredPackages">
+        <value>
+          <list size="9">
+            <item index="0" class="java.lang.String" itemvalue="aiodns" />
+            <item index="1" class="java.lang.String" itemvalue="asyncio-nats-client" />
+            <item index="2" class="java.lang.String" itemvalue="pymysql" />
+            <item index="3" class="java.lang.String" itemvalue="sentry-sdk" />
+            <item index="4" class="java.lang.String" itemvalue="cffi" />
+            <item index="5" class="java.lang.String" itemvalue="aiomysql" />
+            <item index="6" class="java.lang.String" itemvalue="cchardet" />
+            <item index="7" class="java.lang.String" itemvalue="attr" />
+            <item index="8" class="java.lang.String" itemvalue="pycares" />
+          </list>
+        </value>
+      </option>
+    </inspection_tool>
+  </profile>
+</component>

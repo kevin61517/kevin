@@ -1,0 +1,23 @@
+_merchant:
+- &id001
+  display_name: 0-100
+  pay_type: 0
+  extra:
+    type: '100'
+  name: "\u592A\u967D\u652F\u4ED8-100-test002"
+  app_id: test002
+  app_secret: a4321
+  _tenants: &id002
+  - v999
+  - yh9
+- *id001
+- &id003
+  display_name: 0-100
+  pay_type: 1
+  extra:
+    type: '101'
+  name: "\u592A\u967D\u652F\u4ED8-101-test002"
+  app_id: test002
+  app_secret: a4321
+  _tenants: *id002
+- *id003
