@@ -24,8 +24,10 @@ class A:
 
 
 if __name__ == '__main__':
-    o = Obj('14')
+    o = Obj('14', 'kevin')
     print(o.name)
+    setattr(o, 'cc', '123')
+    print(o)
     # obj = Obj('kevin', 14)
     # print(obj)
     # print(A(name='kevin'))

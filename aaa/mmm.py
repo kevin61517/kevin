@@ -110,6 +110,5 @@ payment = Demo()
 
 
 if __name__ == '__main__':
-    payment.transfer()
-    # payment.on_notify()
-
+    # payment.transfer()
+    payment.on_notify()
